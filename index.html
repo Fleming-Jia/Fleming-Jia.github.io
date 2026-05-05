@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JM | AI Agent 布道者</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Prevent dark-mode flash (FOUC). Run BEFORE Tailwind processes classes. -->
+    <script>
+        (function () {
+            try {
+                var stored = localStorage.getItem('theme');
+                if (stored === 'dark') {
+                    document.documentElement.classList.add('dark');
+                }
+            } catch (e) {}
+        })();
+    </script>
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'Noto Sans SC', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+                        script: ['Caveat', 'cursive'],
+                    },
+                    colors: {
+                        brand: {
+                            50:  '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        },
+                    },
+                    boxShadow: {
+                        'soft': '0 10px 40px -10px rgba(0,0,0,0.08)',
+                        'card': '0 4px 24px -4px rgba(0,0,0,0.06)',
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                        'fade-up': 'fadeUp 0.8s ease-out forwards',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%,100%': { transform: 'translateY(0)' },
+                            '50%':     { transform: 'translateY(-12px)' },
+                        },
+                        fadeUp: {
+                            '0%':   { opacity: '0', transform: 'translateY(20px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                    },
+                }
+            }
+        }
+    </script>
+
+    <style>
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: 'Inter', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            background: #fafafa;
+            color: #1d1d1f;
+            transition: background-color 0.4s ease, color 0.4s ease;
+        }
+        .dark body, html.dark body {
+            background: #0b0f0d;
+            color: #e7eee9;
+        }
+        .highlight-script {
+            font-family: 'Caveat', cursive;
+            color: #4f46e5;
+            background: linear-gradient(180deg, transparent 60%, #e0e7ff 60%);
+            padding: 0 0.25rem;
+            font-weight: 700;
+        }
+        .dark .highlight-script {
+            color: #fcd34d;
+            background: linear-gradient(180deg, transparent 60%, rgba(251, 191, 36, 0.18) 60%);
+        }
+        .highlight-yellow {
+            font-family: 'Caveat', cursive;
+            color: #d97706;
+            background: linear-gradient(180deg, transparent 60%, #fef3c7 60%);
+            padding: 0 0.25rem;
+            font-weight: 700;
+        }
+        .dark .highlight-yellow {
+            color: #fbbf24;
+            background: linear-gradient(180deg, transparent 60%, rgba(251, 191, 36, 0.15) 60%);
+        }
+        .blob-mask {
+            border-radius: 65% 35% 50% 50% / 50% 60% 40% 50%;
+            overflow: hidden;
+        }
+        .glass-nav {
+            background: rgba(255, 255, 255, 0.72);
+            backdrop-filter: saturate(180%) blur(20px);
+            -webkit-backdrop-filter: saturate(180%) blur(20px);
+            transition: background-color 0.4s ease, border-color 0.4s ease;
+        }
+        .dark .glass-nav {
+            background: rgba(11, 15, 13, 0.72);
+        }
+        .icon-tile {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 3rem;
+            height: 3rem;
+            border-radius: 0.875rem;
+        }
+        .project-card:hover .project-img {
+            transform: scale(1.05);
+        }
+        .project-img { transition: transform 0.6s ease; }
+        .reveal { opacity: 0; transform: translateY(24px); transition: all 0.7s ease; }
+        .reveal.visible { opacity: 1; transform: translateY(0); }
+
+        /* Smooth color transition between themes for common elements */
+        section, nav, footer, .glass-nav {
+            transition: background-color 0.4s ease, border-color 0.4s ease, color 0.4s ease;
+        }
+
+        /* Theme toggle: sliding switch */
+        .theme-knob { transform: translate(0, -50%); }
+        html.dark .theme-knob { transform: translate(28px, -50%); }
+        .theme-switch:focus-visible {
+            outline: 2px solid #4f46e5;
+            outline-offset: 2px;
+        }
+        html.dark .theme-switch:focus-visible {
+            outline-color: #fcd34d;
+        }
+    </style>
+</head>
+<body class="overflow-x-hidden">
+
+<!-- ===================== Navigation ===================== -->
+<nav class="glass-nav fixed top-0 inset-x-0 z-50 border-b border-gray-200/60 dark:border-white/10">
+    <div class="max-w-7xl mx-auto px-6 lg:px-10">
+        <div class="flex items-center justify-between h-16">
+            <a href="#home" class="flex items-center gap-2">
+                <span class="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 dark:from-emerald-500 dark:to-amber-400 flex items-center justify-center text-white font-bold">JM</span>
+                <span class="font-semibold text-gray-900 dark:text-gray-100 tracking-tight">JM · Fleming Jia</span>
+            </a>
+            <div class="hidden md:flex items-center gap-8 text-sm text-gray-600 dark:text-gray-400 font-medium">
+                <a href="#home"     class="hover:text-gray-900 dark:hover:text-white transition">首页</a>
+                <a href="#about"    class="hover:text-gray-900 dark:hover:text-white transition">关于我</a>
+                <a href="#projects" class="hover:text-gray-900 dark:hover:text-white transition">作品</a>
+                <a href="#stats"    class="hover:text-gray-900 dark:hover:text-white transition">数据</a>
+                <a href="#contact"  class="hover:text-gray-900 dark:hover:text-white transition">联系</a>
+            </div>
+            <div class="flex items-center gap-2">
+                <!-- Theme toggle (sliding switch) -->
+                <button id="themeToggle" type="button" role="switch" aria-label="切换深浅色"
+                        class="theme-switch group relative inline-flex items-center w-[60px] h-8 rounded-full
+                               bg-gradient-to-br from-gray-50 to-gray-100 dark:from-[#0e1512] dark:to-[#0b0f0d]
+                               border border-amber-200/60 dark:border-amber-300/25
+                               hover:border-amber-300/80 dark:hover:border-amber-300/40
+                               transition-colors shadow-inner overflow-hidden">
+                    <!-- Track icons -->
+                    <span class="absolute left-1.5 top-1/2 -translate-y-1/2 text-[11px] text-amber-600 dark:text-amber-400/50 transition-colors">
+                        <i class="fa-solid fa-sun"></i>
+                    </span>
+                    <span class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[11px] text-slate-500 dark:text-amber-300 transition-colors">
+                        <i class="fa-solid fa-moon"></i>
+                    </span>
+                    <!-- Sliding knob -->
+                    <span class="theme-knob absolute top-1/2 left-0.5 -translate-y-1/2 w-7 h-7 rounded-full
+                                 bg-gradient-to-br from-amber-100 to-amber-200/80 dark:from-[#13362E] dark:to-[#0F2A24]
+                                 shadow-[0_2px_6px_rgba(217,119,6,0.25),0_0_0_1px_rgba(251,191,36,0.3)]
+                                 dark:shadow-[0_2px_8px_rgba(0,0,0,0.6),0_0_0_1px_rgba(252,211,77,0.2)]
+                                 transition-transform duration-300 ease-out"></span>
+                </button>
+                <a href="#contact" class="hidden md:inline-flex items-center gap-2 bg-gray-900 dark:bg-amber-200 text-white dark:text-[#0F2A24] px-4 py-2 rounded-full text-sm font-medium hover:bg-gray-700 dark:hover:bg-amber-100 transition">
+                    <i class="fa-regular fa-paper-plane text-xs"></i>
+                    合作咨询
+                </a>
+                <button id="menuBtn" class="md:hidden text-gray-700 dark:text-gray-200 text-xl">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+            </div>
+        </div>
+        <!-- Mobile menu -->
+        <div id="mobileMenu" class="md:hidden hidden pb-4 space-y-2 text-sm font-medium">
+            <a href="#home"     class="block py-2 text-gray-700 dark:text-gray-300">首页</a>
+            <a href="#about"    class="block py-2 text-gray-700 dark:text-gray-300">关于我</a>
+            <a href="#projects" class="block py-2 text-gray-700 dark:text-gray-300">作品</a>
+            <a href="#stats"    class="block py-2 text-gray-700 dark:text-gray-300">数据</a>
+            <a href="#contact"  class="block py-2 text-gray-700 dark:text-gray-300">联系</a>
+        </div>
+    </div>
+</nav>
+
+<!-- ===================== Hero Section ===================== -->
+<section id="home" class="pt-24 lg:pt-32 pb-16 lg:pb-24 bg-gradient-to-b from-indigo-50 via-indigo-50/40 to-white dark:from-[#0b0f0d] dark:via-[#0e1512] dark:to-[#0b0f0d]">
+    <div class="max-w-7xl mx-auto px-6 lg:px-10">
+        <div class="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+
+            <!-- Left text -->
+            <div class="reveal">
+                <span class="inline-flex items-center gap-2 bg-white dark:bg-white/10 border border-gray-200 dark:border-white/15 px-4 py-1.5 rounded-full text-sm text-gray-600 dark:text-gray-300 shadow-sm">
+                    <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                    AI Agent 布道者 · 开放合作中
+                </span>
+
+                <h1 class="mt-6 text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.15] text-gray-900 dark:text-white tracking-tight">
+                    用 AI 重新定义
+                    <br>
+                    <span class="highlight-script text-5xl sm:text-6xl lg:text-7xl">workflow</span>
+                    <br>
+                    <span class="whitespace-nowrap lg:text-[3.5rem]">用Agent解放每一个人的<span class="highlight-script">生产力</span></span>
+                </h1>
+
+                <p class="mt-6 text-lg text-gray-600 dark:text-gray-300 leading-relaxed max-w-xl">
+                    我是<strong class="text-gray-900 dark:text-white">JM</strong>，前互联网开发，现AI产品人，专注于AI-Native 和 Agent产品。
+                    企业AI转型资深顾问，外贸 AI 学习圈专业讲师。
+                    用智能体重塑工作方式，已帮助 5000+ 学员、30+ 团队完成 AI 转型。
+                </p>
+
+                <div class="mt-10 flex flex-wrap gap-4">
+                    <a href="#contact" class="group inline-flex items-center gap-2 bg-[#0F2A24] hover:bg-[#13362E] dark:bg-amber-200 dark:hover:bg-amber-100 text-white dark:text-[#0F2A24] px-7 py-3.5 rounded-full font-medium shadow-lg shadow-emerald-900/25 ring-1 ring-amber-200/20 dark:ring-amber-300/40 hover:ring-amber-200/40 transition-all hover:-translate-y-0.5">
+                        <i class="fa-solid fa-comments-dollar text-amber-300/90 group-hover:text-amber-200 dark:text-[#0F2A24] dark:group-hover:text-[#0F2A24] transition"></i>
+                        合作咨询
+                    </a>
+                    <a href="#projects" class="inline-flex items-center gap-2 border border-gray-300 dark:border-white/20 hover:border-gray-900 dark:hover:border-amber-200 text-gray-900 dark:text-gray-100 px-7 py-3.5 rounded-full font-medium transition-all hover:-translate-y-0.5">
+                        <i class="fa-regular fa-circle-play"></i>
+                        查看作品
+                    </a>
+                </div>
+
+                <!-- Quick credentials -->
+                <div class="mt-10 grid grid-cols-3 gap-4 max-w-md">
+                    <div>
+                        <div class="text-2xl font-bold text-gray-900 dark:text-white">5000<span class="text-indigo-600 dark:text-amber-300">+</span></div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">学员认证</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold text-gray-900 dark:text-white">30<span class="text-indigo-600 dark:text-amber-300">+</span></div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">企业团队</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold text-gray-900 dark:text-white">10000<span class="text-indigo-600 dark:text-amber-300">+</span></div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">万人智能体计划</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right visual -->
+            <div class="relative reveal flex justify-center lg:justify-end">
+                <!-- Decorative blobs -->
+                <div class="absolute -top-10 -left-10 w-40 h-40 bg-emerald-300/25 dark:bg-emerald-400/15 rounded-full blur-3xl"></div>
+                <div class="absolute -bottom-10 -right-10 w-56 h-56 bg-amber-300/25 dark:bg-amber-300/15 rounded-full blur-3xl"></div>
+
+                <div class="relative">
+                    <div class="blob-mask w-[280px] sm:w-[360px] lg:w-[440px] aspect-square shadow-2xl shadow-emerald-900/20 dark:shadow-emerald-950/60 ring-1 ring-amber-200/40 dark:ring-amber-300/30 animate-float bg-gradient-to-br from-emerald-50 to-amber-50 dark:from-emerald-900/30 dark:to-amber-900/20">
+                        <img src="assets/tx.png" alt="JM · Fleming Jia 头像" class="w-full h-full object-cover object-[center_25%]">
+                    </div>
+
+                    <!-- Floating cards -->
+                    <div class="absolute -left-4 sm:-left-12 top-10 bg-white dark:bg-white/10 dark:backdrop-blur rounded-2xl shadow-card px-4 py-3 flex items-center gap-3 border border-gray-100 dark:border-white/15">
+                        <div class="icon-tile bg-indigo-100 text-indigo-600 dark:bg-emerald-500/20 dark:text-emerald-300">
+                            <i class="fa-solid fa-robot"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">高级AI 产品经理</div>
+                            <div class="text-sm font-semibold text-gray-900 dark:text-white">AI-Native公司</div>
+                        </div>
+                    </div>
+
+                    <div class="absolute -right-2 sm:-right-8 bottom-12 bg-white dark:bg-white/10 dark:backdrop-blur rounded-2xl shadow-card px-4 py-3 flex items-center gap-3 border border-gray-100 dark:border-white/15">
+                        <div class="icon-tile bg-amber-100 text-amber-600 dark:bg-amber-300/20 dark:text-amber-200">
+                            <i class="fa-solid fa-graduation-cap"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">专业讲师</div>
+                            <div class="text-sm font-semibold text-gray-900 dark:text-white">外贸AI 学习圈</div>
+                        </div>
+                    </div>
+
+                    <div class="absolute right-4 -top-4 bg-white dark:bg-white/10 dark:backdrop-blur rounded-2xl shadow-card px-4 py-2.5 flex items-center gap-2 border border-gray-100 dark:border-white/15">
+                        <span class="w-2 h-2 bg-green-500 rounded-full"></span>
+                        <span class="text-xs font-medium text-gray-700 dark:text-gray-200">在线 · 接受咨询</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</section>
+
+<!-- ===================== About Section ===================== -->
+<section id="about" class="py-20 lg:py-28 bg-white dark:bg-[#0b0f0d]">
+    <div class="max-w-7xl mx-auto px-6 lg:px-10">
+        <div class="text-center max-w-3xl mx-auto reveal">
+            <span class="text-sm font-semibold text-indigo-600 dark:text-amber-300 tracking-widest uppercase">About Me</span>
+            <h2 class="mt-4 text-3xl sm:text-4xl lg:text-5xl font-extrabold text-gray-900 dark:text-white leading-tight">
+                让每个人都能驾驭
+                <span class="highlight-yellow">AI Agent</span>
+            </h2>
+            <p class="mt-6 text-lg text-gray-600 dark:text-gray-300 leading-relaxed">
+                产品经理 · 开源社区主理人 · 效率革命推动者。
+                致力于通过智能体工作流，把繁琐的事情交给 AI，让人专注真正重要的创造。
+            </p>
+        </div>
+
+        <div class="mt-16 grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+            <div class="reveal bg-gradient-to-br from-indigo-50 to-white dark:from-white/5 dark:to-transparent p-8 rounded-3xl border border-gray-100 dark:border-white/10 hover:shadow-soft dark:hover:border-white/20 transition">
+                <div class="icon-tile bg-indigo-600 text-white dark:bg-emerald-500/30 dark:text-emerald-200">
+                    <i class="fa-solid fa-briefcase text-lg"></i>
+                </div>
+                <h3 class="mt-5 text-xl font-bold text-gray-900 dark:text-white">AI-Native公司 AI 产品经理</h3>
+                <p class="mt-3 text-gray-600 dark:text-gray-400 leading-relaxed text-sm">
+                    深度参与AI原生 产品打磨，具备从 0 到 1 的产品方法论与从 1 到 N 的规模化路径。
+                </p>
+            </div>
+
+            <div class="reveal bg-gradient-to-br from-amber-50 to-white dark:from-white/5 dark:to-transparent p-8 rounded-3xl border border-gray-100 dark:border-white/10 hover:shadow-soft dark:hover:border-white/20 transition">
+                <div class="icon-tile bg-amber-500 text-white dark:bg-amber-400/30 dark:text-amber-200">
+                    <i class="fa-solid fa-chalkboard-user text-lg"></i>
+                </div>
+                <h3 class="mt-5 text-xl font-bold text-gray-900 dark:text-white">企业 AI 转型培训讲师</h3>
+                <p class="mt-3 text-gray-600 dark:text-gray-400 leading-relaxed text-sm">
+                    5000+ 学员认证，覆盖产品、运营、研发岗位，帮助企业建立 AI 原生团队能力。
+                </p>
+            </div>
+
+            <div class="reveal bg-gradient-to-br from-purple-50 to-white dark:from-white/5 dark:to-transparent p-8 rounded-3xl border border-gray-100 dark:border-white/10 hover:shadow-soft dark:hover:border-white/20 transition">
+                <div class="icon-tile bg-purple-600 text-white dark:bg-purple-500/30 dark:text-purple-200">
+                    <i class="fa-solid fa-microphone-lines text-lg"></i>
+                </div>
+                <h3 class="mt-5 text-xl font-bold text-gray-900 dark:text-white">外贸AI学习圈 专业讲师</h3>
+                <p class="mt-3 text-gray-600 dark:text-gray-400 leading-relaxed text-sm">
+                    AI 学习圈核心讲师，在垂直赛道传播 AI Agent 落地方法论。
+                </p>
+            </div>
+
+            <div class="reveal bg-gradient-to-br from-emerald-50 to-white dark:from-white/5 dark:to-transparent p-8 rounded-3xl border border-gray-100 dark:border-white/10 hover:shadow-soft dark:hover:border-white/20 transition">
+                <div class="icon-tile bg-emerald-600 text-white dark:bg-emerald-500/30 dark:text-emerald-200">
+                    <i class="fa-solid fa-handshake text-lg"></i>
+                </div>
+                <h3 class="mt-5 text-xl font-bold text-gray-900 dark:text-white">企业 AI 转型咨询</h3>
+                <p class="mt-3 text-gray-600 dark:text-gray-400 leading-relaxed text-sm">
+                    已助力 30+ 团队完成智能体工作流部署，从需求诊断到落地交付的全链路咨询服务。
+                </p>
+            </div>
+
+            <div class="reveal bg-gradient-to-br from-rose-50 to-white dark:from-white/5 dark:to-transparent p-8 rounded-3xl border border-gray-100 dark:border-white/10 hover:shadow-soft dark:hover:border-white/20 transition">
+                <div class="icon-tile bg-rose-500 text-white dark:bg-rose-500/30 dark:text-rose-200">
+                    <i class="fa-solid fa-rocket text-lg"></i>
+                </div>
+                <h3 class="mt-5 text-xl font-bold text-gray-900 dark:text-white">万人智能体计划</h3>
+                <p class="mt-3 text-gray-600 dark:text-gray-400 leading-relaxed text-sm">
+                    用 AI 解放 10000 人的生产力，构建可复制、可传承的智能体应用样板。
+                </p>
+            </div>
+
+            <div class="reveal bg-gradient-to-br from-sky-50 to-white dark:from-white/5 dark:to-transparent p-8 rounded-3xl border border-gray-100 dark:border-white/10 hover:shadow-soft dark:hover:border-white/20 transition">
+                <div class="icon-tile bg-sky-600 text-white dark:bg-sky-500/30 dark:text-sky-200">
+                    <i class="fa-solid fa-code text-lg"></i>
+                </div>
+                <h3 class="mt-5 text-xl font-bold text-gray-900 dark:text-white">独立产品创业者</h3>
+                <p class="mt-3 text-gray-600 dark:text-gray-400 leading-relaxed text-sm">
+                    使用 AI 不写一行代码实现产品商业化，亲身验证 AI 时代的OPC模式。
+                </p>
+            </div>
+
+        </div>
+    </div>
+</section>
+
+<!-- ===================== Projects Section ===================== -->
+<section id="projects" class="py-20 lg:py-28 bg-gradient-to-b from-gray-50 to-white dark:from-[#0e1311] dark:to-[#0b0f0d]">
+    <div class="max-w-7xl mx-auto px-6 lg:px-10">
+        <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6 reveal">
+            <div>
+                <span class="text-sm font-semibold text-indigo-600 dark:text-amber-300 tracking-widest uppercase">My Works</span>
+                <h2 class="mt-4 text-3xl sm:text-4xl lg:text-5xl font-extrabold text-gray-900 dark:text-white leading-tight">
+                    精选<span class="highlight-script text-4xl sm:text-5xl lg:text-6xl">作品</span>
+                </h2>
+                <p class="mt-4 text-gray-600 dark:text-gray-300 max-w-xl">
+                    从开源知识库到独立产品，每一个项目都是 AI 时代生产力工具的探索与实践。
+                </p>
+            </div>
+            <a href="#" class="hidden lg:inline-flex items-center gap-2 text-indigo-600 dark:text-amber-300 font-medium hover:text-indigo-800 dark:hover:text-amber-200">
+                查看全部 <i class="fa-solid fa-arrow-right text-sm"></i>
+            </a>
+        </div>
+
+        <div class="mt-12 grid md:grid-cols-2 lg:grid-cols-3 gap-7">
+
+            <!-- Project 1 -->
+            <a href="https://agent101.feishu.cn/wiki/KLarwIA1piLrBYk7bf2cBf3HnNe" target="_blank" rel="noopener"
+               class="project-card group bg-white dark:bg-white/5 rounded-3xl overflow-hidden border border-gray-100 dark:border-white/10 hover:shadow-soft dark:hover:border-white/20 transition-all hover:-translate-y-1 reveal block">
+                <div class="aspect-[16/10] overflow-hidden bg-gray-100 dark:bg-white/5 relative">
+                    <img src="https://picsum.photos/1200/750?random=11" class="project-img w-full h-full object-cover" alt="Agent 101">
+                    <div class="absolute top-4 left-4 bg-white/95 dark:bg-black/60 dark:backdrop-blur px-3 py-1 rounded-full text-xs font-medium text-gray-700 dark:text-gray-200">
+                        <i class="fa-solid fa-book-open text-indigo-600 dark:text-amber-300 mr-1"></i> 开源知识库
+                    </div>
+                </div>
+                <div class="p-6">
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-amber-300 transition">
+                        Agent 101 智能体指北
+                    </h3>
+                    <p class="mt-2 text-gray-600 dark:text-gray-400 text-sm leading-relaxed">
+                        从零到一的 AI Agent 学习路径，覆盖工具、方法、场景与案例的开源百科。
+                    </p>
+                    <div class="mt-5 flex items-center justify-between">
+                        <span class="text-xs text-gray-400 dark:text-gray-500">飞书 · Wiki</span>
+                        <span class="inline-flex items-center gap-1 text-indigo-600 dark:text-amber-300 text-sm font-medium">
+                            访问 <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+                        </span>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Project 2 -->
+            <a href="https://agent101.cn/" target="_blank" rel="noopener"
+               class="project-card group bg-white dark:bg-white/5 rounded-3xl overflow-hidden border border-gray-100 dark:border-white/10 hover:shadow-soft dark:hover:border-white/20 transition-all hover:-translate-y-1 reveal block">
+                <div class="aspect-[16/10] overflow-hidden bg-gray-100 dark:bg-white/5 relative">
+                    <img src="https://picsum.photos/1200/750?random=12" class="project-img w-full h-full object-cover" alt="JM的AI公开课">
+                    <div class="absolute top-4 left-4 bg-white/95 dark:bg-black/60 dark:backdrop-blur px-3 py-1 rounded-full text-xs font-medium text-gray-700 dark:text-gray-200">
+                        <i class="fa-solid fa-graduation-cap text-amber-600 dark:text-amber-300 mr-1"></i> 公开课程
+                    </div>
+                </div>
+                <div class="p-6">
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-amber-300 transition">
+                        JM 的 AI 公开课
+                    </h3>
+                    <p class="mt-2 text-gray-600 dark:text-gray-400 text-sm leading-relaxed">
+                        系统化的 AI Agent 公开课程平台，让 AI 能力人人可学、人人可用。
+                    </p>
+                    <div class="mt-5 flex items-center justify-between">
+                        <span class="text-xs text-gray-400 dark:text-gray-500">agent101.cn</span>
+                        <span class="inline-flex items-center gap-1 text-indigo-600 dark:text-amber-300 text-sm font-medium">
+                            访问 <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+                        </span>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Project 3 -->
+            <a href="https://yonote.net/" target="_blank" rel="noopener"
+               class="project-card group bg-white dark:bg-white/5 rounded-3xl overflow-hidden border border-gray-100 dark:border-white/10 hover:shadow-soft dark:hover:border-white/20 transition-all hover:-translate-y-1 reveal block">
+                <div class="aspect-[16/10] overflow-hidden bg-gray-100 dark:bg-white/5 relative">
+                    <img src="https://picsum.photos/1200/750?random=13" class="project-img w-full h-full object-cover" alt="YoNote">
+                    <div class="absolute top-4 left-4 bg-white/95 dark:bg-black/60 dark:backdrop-blur px-3 py-1 rounded-full text-xs font-medium text-gray-700 dark:text-gray-200">
+                        <i class="fa-solid fa-wand-magic-sparkles text-purple-600 dark:text-amber-300 mr-1"></i> 独立产品
+                    </div>
+                </div>
+                <div class="p-6">
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-amber-300 transition">
+                        YoNote 万物可视化 Agent
+                    </h3>
+                    <p class="mt-2 text-gray-600 dark:text-gray-400 text-sm leading-relaxed">
+                        把任何信息变成可视化卡片与知识图谱，让你像编辑思维一样编辑信息。
+                    </p>
+                    <div class="mt-5 flex items-center justify-between">
+                        <span class="text-xs text-gray-400 dark:text-gray-500">yonote.net</span>
+                        <span class="inline-flex items-center gap-1 text-indigo-600 dark:text-amber-300 text-sm font-medium">
+                            访问 <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+                        </span>
+                    </div>
+                </div>
+            </a>
+
+        </div>
+    </div>
+</section>
+
+<!-- ===================== Stats / Highlights ===================== -->
+<section id="stats" class="py-20 lg:py-24 bg-white dark:bg-[#0b0f0d]">
+    <div class="max-w-7xl mx-auto px-6 lg:px-10">
+        <div class="relative overflow-hidden rounded-3xl bg-gray-900 dark:bg-[#070a09] text-white px-6 sm:px-10 lg:px-14 py-16 lg:py-20 ring-1 ring-white/5 shadow-2xl shadow-gray-900/20 dark:shadow-black/40">
+            <!-- background blobs -->
+            <div class="absolute top-0 left-1/4 w-96 h-96 bg-indigo-600/20 dark:bg-emerald-500/15 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-600/20 dark:bg-amber-400/15 rounded-full blur-3xl pointer-events-none"></div>
+
+            <div class="relative">
+                <div class="text-center max-w-3xl mx-auto reveal">
+                    <span class="text-sm font-semibold text-indigo-300 dark:text-amber-300 tracking-widest uppercase">Highlights</span>
+                    <h2 class="mt-4 text-3xl sm:text-4xl lg:text-5xl font-extrabold leading-tight">
+                        数字背后，是<span class="highlight-script text-4xl sm:text-5xl lg:text-6xl">真实改变</span>
+                    </h2>
+                </div>
+
+                <div class="mt-14 grid grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="reveal text-center bg-white/5 backdrop-blur rounded-2xl p-8 border border-white/10">
+                        <div class="text-4xl sm:text-5xl font-extrabold bg-gradient-to-br from-indigo-300 to-purple-300 bg-clip-text text-transparent">5000+</div>
+                        <div class="mt-2 text-gray-300 text-sm">学员认证</div>
+                    </div>
+                    <div class="reveal text-center bg-white/5 backdrop-blur rounded-2xl p-8 border border-white/10">
+                        <div class="text-4xl sm:text-5xl font-extrabold bg-gradient-to-br from-amber-300 to-orange-300 bg-clip-text text-transparent">30+</div>
+                        <div class="mt-2 text-gray-300 text-sm">企业 AI 转型</div>
+                    </div>
+                    <div class="reveal text-center bg-white/5 backdrop-blur rounded-2xl p-8 border border-white/10">
+                        <div class="text-4xl sm:text-5xl font-extrabold bg-gradient-to-br from-emerald-300 to-teal-300 bg-clip-text text-transparent">3</div>
+                        <div class="mt-2 text-gray-300 text-sm">独立产品上线</div>
+                    </div>
+                    <div class="reveal text-center bg-white/5 backdrop-blur rounded-2xl p-8 border border-white/10">
+                        <div class="text-4xl sm:text-5xl font-extrabold bg-gradient-to-br from-pink-300 to-rose-300 bg-clip-text text-transparent">10K</div>
+                        <div class="mt-2 text-gray-300 text-sm">万人智能体目标</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ===================== Contact Section ===================== -->
+<section id="contact" class="py-20 lg:py-28 bg-white dark:bg-[#0b0f0d]">
+    <div class="max-w-6xl mx-auto px-6 lg:px-10">
+        <div class="text-center max-w-3xl mx-auto reveal">
+            <span class="text-sm font-semibold text-indigo-600 dark:text-amber-300 tracking-widest uppercase">Get In Touch</span>
+            <h2 class="mt-4 text-3xl sm:text-4xl lg:text-5xl font-extrabold text-gray-900 dark:text-white leading-tight">
+                让我们<span class="highlight-yellow">连接</span>
+            </h2>
+            <p class="mt-6 text-lg text-gray-600 dark:text-gray-300 leading-relaxed">
+                无论是企业 AI 转型咨询、课程合作，还是只是想交个朋友，欢迎通过下方任意渠道与我联系。
+            </p>
+        </div>
+
+        <div class="mt-14 grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+
+            <!-- WeChat Public Account -->
+            <div class="reveal group relative bg-gradient-to-br from-emerald-50 to-white dark:from-white/5 dark:to-transparent p-7 rounded-3xl border border-gray-100 dark:border-white/10 hover:shadow-soft dark:hover:border-white/20 hover:-translate-y-1 transition-all">
+                <div class="icon-tile bg-emerald-500 text-white dark:bg-emerald-500/30 dark:text-emerald-200 text-lg">
+                    <i class="fa-solid fa-bullhorn"></i>
+                </div>
+                <h3 class="mt-5 font-bold text-gray-900 dark:text-white">公众号</h3>
+                <p class="mt-1 text-gray-500 dark:text-gray-400 text-sm">第一时间获取更新</p>
+                <div class="mt-4 inline-flex items-center gap-2 bg-white dark:bg-white/10 px-4 py-2 rounded-full text-sm font-medium text-emerald-700 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-300/20">
+                    <i class="fa-solid fa-mug-hot"></i>
+                    明哥小酒馆
+                </div>
+            </div>
+
+            <!-- WeChat Personal -->
+            <div class="reveal group relative bg-gradient-to-br from-green-50 to-white dark:from-white/5 dark:to-transparent p-7 rounded-3xl border border-gray-100 dark:border-white/10 hover:shadow-soft dark:hover:border-white/20 hover:-translate-y-1 transition-all">
+                <div class="icon-tile bg-green-600 text-white dark:bg-green-500/30 dark:text-green-200 text-lg">
+                    <i class="fa-brands fa-weixin"></i>
+                </div>
+                <h3 class="mt-5 font-bold text-gray-900 dark:text-white">微信</h3>
+                <p class="mt-1 text-gray-500 dark:text-gray-400 text-sm">备注来意优先通过</p>
+                <div class="mt-4 inline-flex items-center gap-2 bg-white dark:bg-white/10 px-4 py-2 rounded-full text-sm font-medium text-green-700 dark:text-green-200 border border-green-200 dark:border-green-300/20 select-all">
+                    <i class="fa-solid fa-id-badge"></i>
+                    jmdaydayup
+                </div>
+            </div>
+
+            <!-- LinkedIn -->
+            <a href="https://www.linkedin.com/in/fleming66" target="_blank" rel="noopener"
+               class="reveal group relative bg-gradient-to-br from-sky-50 to-white dark:from-white/5 dark:to-transparent p-7 rounded-3xl border border-gray-100 dark:border-white/10 hover:shadow-soft dark:hover:border-white/20 hover:-translate-y-1 transition-all block">
+                <div class="icon-tile bg-sky-600 text-white dark:bg-sky-500/30 dark:text-sky-200 text-lg">
+                    <i class="fa-brands fa-linkedin-in"></i>
+                </div>
+                <h3 class="mt-5 font-bold text-gray-900 dark:text-white">LinkedIn</h3>
+                <p class="mt-1 text-gray-500 dark:text-gray-400 text-sm">专业人脉与合作</p>
+                <div class="mt-4 inline-flex items-center gap-2 text-sm font-medium text-sky-700 dark:text-sky-300">
+                    @fleming66 <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+                </div>
+            </a>
+
+            <!-- Facebook -->
+            <a href="https://www.facebook.com/ming.jia.984" target="_blank" rel="noopener"
+               class="reveal group relative bg-gradient-to-br from-blue-50 to-white dark:from-white/5 dark:to-transparent p-7 rounded-3xl border border-gray-100 dark:border-white/10 hover:shadow-soft dark:hover:border-white/20 hover:-translate-y-1 transition-all block">
+                <div class="icon-tile bg-blue-600 text-white dark:bg-blue-500/30 dark:text-blue-200 text-lg">
+                    <i class="fa-brands fa-facebook-f"></i>
+                </div>
+                <h3 class="mt-5 font-bold text-gray-900 dark:text-white">Facebook</h3>
+                <p class="mt-1 text-gray-500 dark:text-gray-400 text-sm">海外朋友请走这里</p>
+                <div class="mt-4 inline-flex items-center gap-2 text-sm font-medium text-blue-700 dark:text-blue-300">
+                    @ming.jia.984 <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+                </div>
+            </a>
+
+        </div>
+
+        <!-- CTA banner -->
+        <div class="mt-16 reveal rounded-3xl bg-gradient-to-br from-[#0F2A24] via-[#13362E] to-[#1A4A3E] p-10 lg:p-14 text-white relative ring-1 ring-amber-200/15 shadow-2xl shadow-emerald-950/30">
+            <!-- Decorative blur shapes (clipped to banner) -->
+            <div class="absolute inset-0 overflow-hidden rounded-3xl pointer-events-none">
+                <div class="absolute -top-12 -right-12 w-64 h-64 bg-amber-300/15 rounded-full blur-3xl"></div>
+                <div class="absolute -bottom-16 -left-10 w-72 h-72 bg-emerald-400/10 rounded-full blur-3xl"></div>
+                <!-- subtle gold hairline -->
+                <div class="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-amber-200/40 to-transparent"></div>
+            </div>
+
+            <div class="relative grid lg:grid-cols-3 gap-8 items-center">
+                <div class="lg:col-span-2">
+                    <h3 class="text-2xl sm:text-3xl lg:text-4xl font-extrabold leading-tight">
+                        准备好开启你的 AI 转型之旅了吗？
+                    </h3>
+                    <p class="mt-4 text-emerald-50/80 max-w-xl leading-relaxed">
+                        欢迎扫码加微信，沟通企业咨询、课程合作或独立产品共创。
+                        让我们一起，把 AI 的红利落到每个人手里。
+                    </p>
+                </div>
+                <div class="flex lg:justify-end">
+                    <div class="relative group">
+                        <a href="#" class="inline-flex items-center gap-2 bg-gradient-to-b from-amber-100 to-amber-200 text-[#0F2A24] px-7 py-4 rounded-full font-semibold shadow-lg shadow-emerald-950/40 ring-1 ring-amber-300/60 hover:from-amber-50 hover:to-amber-100 hover:-translate-y-0.5 transition">
+                            <i class="fa-brands fa-weixin"></i>
+                            立即联系
+                        </a>
+
+                        <!-- QR Code Popup -->
+                        <div class="qr-popup absolute left-1/2 -translate-x-1/2 bottom-full mb-4 w-56
+                                    bg-white rounded-2xl shadow-2xl border border-gray-100 p-4
+                                    opacity-0 invisible translate-y-2
+                                    group-hover:opacity-100 group-hover:visible group-hover:translate-y-0
+                                    transition-all duration-300 z-30 pointer-events-none">
+                            <img src="assets/wechat-qr.jpg"
+                                 alt="WeChat QR Code"
+                                 class="w-full aspect-square rounded-xl bg-gray-50 object-contain">
+                            <div class="mt-3 text-center">
+                                <div class="text-xs text-gray-500">微信扫码添加</div>
+                                <div class="text-sm font-semibold text-gray-900 mt-0.5">
+                                    <i class="fa-brands fa-weixin text-green-600 mr-1"></i>
+                                    jmdaydayup
+                                </div>
+                            </div>
+                            <!-- Arrow -->
+                            <div class="absolute left-1/2 -translate-x-1/2 -bottom-1.5 w-3 h-3
+                                        bg-white border-r border-b border-gray-100 rotate-45"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ===================== Footer ===================== -->
+<footer class="bg-gray-50 dark:bg-[#070a09] border-t border-gray-200 dark:border-white/10">
+    <div class="max-w-7xl mx-auto px-6 lg:px-10 py-12">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+            <div class="flex items-center gap-3">
+                <span class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 dark:from-emerald-500 dark:to-amber-400 flex items-center justify-center text-white font-bold">JM</span>
+                <div>
+                    <div class="font-semibold text-gray-900 dark:text-white">JM · Fleming Jia</div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">AI Agent 布道者 · 万人智能体计划</div>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <a href="https://www.linkedin.com/in/fleming66" target="_blank" rel="noopener" class="w-10 h-10 rounded-full bg-white dark:bg-white/10 border border-gray-200 dark:border-white/15 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:text-sky-600 hover:border-sky-300 dark:hover:text-sky-300 transition">
+                    <i class="fa-brands fa-linkedin-in"></i>
+                </a>
+                <a href="https://www.facebook.com/ming.jia.984" target="_blank" rel="noopener" class="w-10 h-10 rounded-full bg-white dark:bg-white/10 border border-gray-200 dark:border-white/15 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:text-blue-600 hover:border-blue-300 dark:hover:text-blue-300 transition">
+                    <i class="fa-brands fa-facebook-f"></i>
+                </a>
+                <div class="relative group">
+                    <a href="#contact" class="w-10 h-10 rounded-full bg-white dark:bg-white/10 border border-gray-200 dark:border-white/15 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:text-green-600 hover:border-green-300 dark:hover:text-green-300 transition">
+                        <i class="fa-brands fa-weixin"></i>
+                    </a>
+                    <!-- QR Code Popup -->
+                    <div class="absolute left-1/2 -translate-x-1/2 bottom-full mb-3 w-56
+                                bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-white/10 p-4
+                                opacity-0 invisible translate-y-2
+                                group-hover:opacity-100 group-hover:visible group-hover:translate-y-0
+                                transition-all duration-300 z-30 pointer-events-none">
+                        <img src="assets/wechat-qr.jpg"
+                             alt="WeChat QR Code"
+                             class="w-full aspect-square rounded-xl bg-gray-50 dark:bg-gray-700 object-contain">
+                        <div class="mt-3 text-center">
+                            <div class="text-xs text-gray-500 dark:text-gray-400">微信扫码添加</div>
+                            <div class="text-sm font-semibold text-gray-900 dark:text-white mt-0.5">
+                                <i class="fa-brands fa-weixin text-green-600 dark:text-green-400 mr-1"></i>
+                                jmdaydayup
+                            </div>
+                        </div>
+                        <!-- Arrow -->
+                        <div class="absolute left-1/2 -translate-x-1/2 -bottom-1.5 w-3 h-3
+                                    bg-white dark:bg-gray-800 border-r border-b border-gray-100 dark:border-white/10 rotate-45"></div>
+                    </div>
+                </div>
+                <div class="relative group">
+                    <a href="#contact" class="w-10 h-10 rounded-full bg-white dark:bg-white/10 border border-gray-200 dark:border-white/15 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:text-emerald-600 hover:border-emerald-300 dark:hover:text-emerald-300 transition">
+                        <i class="fa-solid fa-bullhorn"></i>
+                    </a>
+                    <!-- QR Code Popup -->
+                    <div class="absolute left-1/2 -translate-x-1/2 bottom-full mb-3 w-56
+                                bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-white/10 p-4
+                                opacity-0 invisible translate-y-2
+                                group-hover:opacity-100 group-hover:visible group-hover:translate-y-0
+                                transition-all duration-300 z-30 pointer-events-none">
+                        <img src="assets/qrcode_gzh.jpg"
+                             alt="公众号二维码"
+                             class="w-full aspect-square rounded-xl bg-gray-50 dark:bg-gray-700 object-contain">
+                        <div class="mt-3 text-center">
+                            <div class="text-xs text-gray-500 dark:text-gray-400">扫码关注公众号</div>
+                            <div class="text-sm font-semibold text-gray-900 dark:text-white mt-0.5">
+                                <i class="fa-solid fa-mug-hot text-emerald-600 dark:text-emerald-400 mr-1"></i>
+                                明哥小酒馆
+                            </div>
+                        </div>
+                        <!-- Arrow -->
+                        <div class="absolute left-1/2 -translate-x-1/2 -bottom-1.5 w-3 h-3
+                                    bg-white dark:bg-gray-800 border-r border-b border-gray-100 dark:border-white/10 rotate-45"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-10 pt-6 border-t border-gray-200 dark:border-white/10 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+            <div>© 2026 JM · Fleming Jia. All rights reserved.</div>
+            <div class="flex items-center gap-2">
+                Made with <i class="fa-solid fa-heart text-rose-500"></i> and <i class="fa-solid fa-robot text-indigo-500 dark:text-amber-300"></i> AI
+            </div>
+        </div>
+    </div>
+</footer>
+
+<!-- ===================== Scripts ===================== -->
+<script>
+    // Mobile menu toggle
+    const menuBtn = document.getElementById('menuBtn');
+    const mobileMenu = document.getElementById('mobileMenu');
+    menuBtn?.addEventListener('click', () => mobileMenu.classList.toggle('hidden'));
+    mobileMenu?.querySelectorAll('a').forEach(a => a.addEventListener('click', () => mobileMenu.classList.add('hidden')));
+
+    // Theme toggle (light / dark) with localStorage persistence — default: light
+    const themeToggle = document.getElementById('themeToggle');
+    const syncSwitchA11y = () => {
+        if (!themeToggle) return;
+        themeToggle.setAttribute('aria-checked', document.documentElement.classList.contains('dark') ? 'true' : 'false');
+    };
+    syncSwitchA11y();
+    themeToggle?.addEventListener('click', () => {
+        const root = document.documentElement;
+        const isDark = root.classList.toggle('dark');
+        try {
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        } catch (e) {}
+        syncSwitchA11y();
+    });
+
+    // Reveal on scroll
+    const io = new IntersectionObserver((entries) => {
+        entries.forEach(e => {
+            if (e.isIntersecting) {
+                e.target.classList.add('visible');
+                io.unobserve(e.target);
+            }
+        });
+    }, { threshold: 0.12 });
+
+    document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+</script>
+
+</body>
+</html>
